@@ -6,7 +6,7 @@ from Navbar import navbar_layout
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP], assets_url_path='/assets/')
 
 index_layout=html.Div(
-        children=[
+    children=[
         navbar_layout(),
         html.H1("首頁"),
         html.P("這是首頁"),
