@@ -3,6 +3,8 @@ import dash_bootstrap_components as dbc
 from dash import html, dcc
 from dash.dependencies import Input, Output, State
 import datetime
+import plotly.graph_objs as go
+import pandas as pd
 
 start_date = datetime.datetime(2021, 1, 1, 4, 0, 0)  # 設定最早和最晚的日期
 end_date = datetime.datetime(2023, 12, 31, 10, 0, 0)
@@ -10,6 +12,24 @@ start_ts = int(start_date.timestamp())  # 將日期轉換為unix timestamp
 end_ts = int(end_date.timestamp())
 start_str = start_date.strftime('%Y/%m/%d %H:%M')
 end_str = end_date.strftime('%Y/%m/%d %H:%M')
+
+# 讀取CSV檔案，注意需替換為實際路徑
+df = pd.read_csv("data/CHARTEVENTS_6.csv")
+
+# 篩選subject_id為10694且item_id為220045的資料
+df_filtered = df[(df['subject_id'] == 10694) & (df['itemid'] == 220045)]
+
+# 創建散佈圖
+fig = go.Figure()
+
+# 設置x軸為charttime，y軸為value
+fig.add_trace(go.Scatter(x=df_filtered['charttime'], y=df_filtered['value'], mode='markers'))
+
+# 設置標題和軸標籤
+fig.update_layout(title='Subject 10694, Item 220045', xaxis_title='Charttime', yaxis_title='Value')
+
+# 顯示圖表
+#fig.show()
 
 def Agechange(dobtime,datatime):
     return [str(datatime.year - dobtime.year - ((dobtime.month, dobtime.day) < (dobtime.month, dobtime.day)))]
@@ -26,12 +46,12 @@ def chartcontent_layout():
             ),
             dbc.Button("查詢", outline=True, id="submit", color="primary", n_clicks=0, className="ml-2"),
             html.Div(
-                dcc.Slider(
+                dcc.RangeSlider(
                     id='date-slider',
                     min=start_ts,
                     max=end_ts,
                     step=3600,  # 一天的秒數
-                    value=start_ts,
+                    value=[start_ts, end_ts],
                     marks={
                         start_ts: start_str,
                         end_ts: end_str
@@ -55,34 +75,10 @@ def chartcontent_layout():
                     dbc.Col(html.Hr())
                 ),
             ],fluid=True),
+
             dbc.Container([
-                dbc.Row([
-                    dbc.Col(html.H6("體溫"), width=3),
-                    dbc.Col(html.H6("心率"), width=3),
-                    dbc.Col(html.H6("收縮、舒張及血壓"), width=3),
-                    dbc.Col(html.H6("BMI"), width=3)
-                ], justify="center"),
-                dbc.Row([
-                    dbc.Col(html.Img(src='/assets/temperature.jpg'), width=3),
-                    dbc.Col(html.Img(src='/assets/heartrate.jpg'), width=3),
-                    dbc.Col(html.Img(src='/assets/presure.jpg'), width=3),
-                    dbc.Col(html.Img(src='/assets/BMI.jpg'), width=3)
-                ]),
-                dbc.Row(
-                    dbc.Col(html.Br())
-                )
-            ],fluid=True),
-            dbc.Container([
-                dbc.Row([
-                    dbc.Col(html.H6("呼吸率"), width=4),
-                    dbc.Col(html.H6("血氧飽和度"), width=4),
-                    dbc.Col(html.H6("吸入氧分率"), width=4)
-                ], justify="center"),
-                dbc.Row([
-                    dbc.Col(html.Img(src='/assets/inspirerate.jpg'), width=4),
-                    dbc.Col(html.Img(src='/assets/Spo2.jpg'), width=4),
-                    dbc.Col(html.Img(src='/assets/Fio2.jpg'), width=4),
-                ]),
-            ],fluid=True),
+                dcc.Graph(figure=fig)
+            ]),
+                        
         ])
     ])
