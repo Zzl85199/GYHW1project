@@ -6,6 +6,7 @@ from Navbar import navbar_layout
 import datetime
 import numpy as np
 from chartcontent import Agechange
+import plotly.graph_objs as go
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP], assets_url_path='/assets/')
 PATIENTS_df = pd.read_csv('data/PATIENTS_6.csv')
@@ -21,9 +22,6 @@ end_ts = int(end_date.timestamp())
 start_str = start_date.strftime('%Y/%m/%d %H:%M')
 end_str = end_date.strftime('%Y/%m/%d %H:%M')
 mark = {start_ts:start_str,end_ts:end_str}
-
-
-
 
 index_layout=html.Div(
     children=[
@@ -115,11 +113,13 @@ def display_page(pathname):
 @app.callback(
     [Output("gender", "children"),Output("date-slider", "min"),Output("date-slider", "max"),
      Output('date-slider', 'marks'),Output("urine", "children"),Output("age", "children"),
-     Output("ICU", "children"),Output("vent", "children"),Output("glasgow", "children")],
+     Output("ICU", "children"),Output("vent", "children"),Output("glasgow", "children"),
+     Output('graph', 'figure')],
     [Input("submit", "n_clicks")],
-    [State("input", "value")]
+    [State("input", "value")],
+    [State('date-slider', 'value')]
 )
-def search(n_clicks,inputs):
+def search(n_clicks,inputs,date_range):
     global start_ts,start_str,end_ts,end_str,mark
     gender_data = [""]
     urine_data = ""
@@ -130,29 +130,19 @@ def search(n_clicks,inputs):
     
     if n_clicks > 0:
         gender_data = PATIENTS_df.loc[PATIENTS_df['subject_id'] == inputs, 'gender'].values
+        
+        charteventCharttime = pd.to_datetime(np.unique(CHARTEVENTS_df.loc[(CHARTEVENTS_df['subject_id'] == inputs) & (CHARTEVENTS_df['itemid'] == 220045), 'charttime'].values))
 
-        #charttime = OUTPUTEVENTS_df.loc[OUTPUTEVENTS_df['subject_id'] == inputs, 'charttime'].values
-        
-        #start = datetime.datetime.strptime(min(charttime), '%Y/%m/%d %H:%M')
-        #start_ts = int(start.timestamp())
-        #start_str = min(charttime)
-        #end = datetime.datetime.strptime(max(charttime), '%Y/%m/%d %H:%M')
-        #end_ts = int(end.timestamp())
-        #end_str = max(charttime)
-        #mark={start_ts: start_str,end_ts: end_str}
-        
-        charteventCharttime = pd.to_datetime(np.unique(CHARTEVENTS_df.loc[CHARTEVENTS_df['subject_id'] == inputs, 'charttime'].values))
-        start = min(charteventCharttime).date() - datetime.timedelta(days=365*200)
+        start = min(charteventCharttime).date()
         start_ts = int((datetime.datetime(start.year, start.month, start.day) - limitdatetime).total_seconds())
         start_str = start.strftime('%Y-%m-%d')
-        end = max(charteventCharttime).date() - datetime.timedelta(days=365*200)
+        end = max(charteventCharttime).date()
         end_ts = int((datetime.datetime(end.year, end.month, end.day) - limitdatetime).total_seconds())
         end_str = end.strftime('%Y-%m-%d')
         mark = {start_ts:start_str,end_ts:end_str}
         
         urine_data = OUTPUTEVENTS_df.loc[OUTPUTEVENTS_df['subject_id'] == inputs]
         urine_data.set_index('charttime')
-        #urine_data = urine_data.loc[urine_data['charttime'] == end_str]
         urine_data = urine_data.loc[urine_data.index.min(),'value']
         
         age_data = PATIENTS_df.loc[PATIENTS_df['subject_id'] == inputs, 'DOB'].values
@@ -182,9 +172,41 @@ def search(n_clicks,inputs):
         glasgow_data_motor.set_index('charttime')
         glasgow_data_motor = glasgow_data_motor.loc[glasgow_data_motor.index.max(), 'valuenum']
         glasgow_data = "eye:" + str(glasgow_data_eye.astype(int)) + " verbal:" + str(glasgow_data_verbal.astype(int)) + " motor:" +str(glasgow_data_motor.astype(int))
+        
+        df_filtered = CHARTEVENTS_df[(CHARTEVENTS_df['subject_id'] == inputs) & (CHARTEVENTS_df['itemid'] == 220045)]
+        df_filtered['charttime'] = pd.to_datetime(df_filtered['charttime'])
+        df_filtered = df_filtered.sort_values(by=['charttime'])
+        df_filtered['value'] = pd.to_numeric(df_filtered['value'])
+        df_filtered = df_filtered.sort_values(by=['value'])
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=df_filtered['charttime'], y=df_filtered['value'], mode='markers'))
+        fig.update_layout(title=f'心率圖統計表 Subject_id : {inputs} ', xaxis_title='日期', yaxis_title='心律(bpm)') 
+        if (date_range[0] - start_ts) < 0:
+            start_percent = 0
+            end_percent = 1
+        else:
+            start_percent = (date_range[0] - start_ts) / (end_ts - start_ts)
+            end_percent = (date_range[1] - start_ts) / (end_ts - start_ts)
+        df_filtered = df_filtered.sort_values(by=['charttime'])
+        start_index = int(start_percent * len(df_filtered['charttime']))
+        end_index = int(end_percent * len(df_filtered['charttime']))-1
+        start_value_str = df_filtered['charttime'].iloc[start_index].strftime("%Y-%m-%d %H:%M:%S")
+        end_value_str = df_filtered['charttime'].iloc[end_index].strftime("%Y-%m-%d %H:%M:%S")
+        start_value = (datetime.datetime.strptime((start_value_str), "%Y-%m-%d %H:%M:%S")).strftime("%Y/%-m/%-d %H:%M")
+        end_value = (datetime.datetime.strptime((end_value_str), "%Y-%m-%d %H:%M:%S")).strftime("%Y/%-m/%-d %H:%M")
+        start_datetime = datetime.datetime.strptime(start_value, "%Y/%m/%d %H:%M")
+        end_datetime = datetime.datetime.strptime(end_value, "%Y/%m/%d %H:%M")
+        fig.update_xaxes(range=[start_datetime, end_datetime])
            
-    return gender_data[0], start_ts, end_ts, mark,urine_data, age_data, icu_data, vent_data, glasgow_data
-
+        #print(start_percent)
+        #print(end_percent)
+        #print(len(df_filtered['charttime']))
+        #print(start_index)
+        #print(end_index)
+        #print(start_value)
+        #print(end_value)
+        
+    return gender_data[0], start_ts, end_ts, mark,urine_data, age_data, icu_data, vent_data, glasgow_data, fig
 
 if __name__ == '__main__':
     app.run_server(debug=False, host='0.0.0.0', port=8050)

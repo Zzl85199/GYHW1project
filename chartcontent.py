@@ -5,6 +5,7 @@ from dash.dependencies import Input, Output, State
 import datetime
 import plotly.graph_objs as go
 import pandas as pd
+import numpy as np
 
 start_date = datetime.datetime(2021, 1, 1, 4, 0, 0)  # 設定最早和最晚的日期
 end_date = datetime.datetime(2023, 12, 31, 10, 0, 0)
@@ -12,24 +13,6 @@ start_ts = int(start_date.timestamp())  # 將日期轉換為unix timestamp
 end_ts = int(end_date.timestamp())
 start_str = start_date.strftime('%Y/%m/%d %H:%M')
 end_str = end_date.strftime('%Y/%m/%d %H:%M')
-
-# 讀取CSV檔案，注意需替換為實際路徑
-df = pd.read_csv("data/CHARTEVENTS_6.csv")
-
-# 篩選subject_id為10694且item_id為220045的資料
-df_filtered = df[(df['subject_id'] == 10694) & (df['itemid'] == 220045)]
-
-# 創建散佈圖
-fig = go.Figure()
-
-# 設置x軸為charttime，y軸為value
-fig.add_trace(go.Scatter(x=df_filtered['charttime'], y=df_filtered['value'], mode='markers'))
-
-# 設置標題和軸標籤
-fig.update_layout(title='Subject 10694, Item 220045', xaxis_title='Charttime', yaxis_title='Value')
-
-# 顯示圖表
-#fig.show()
 
 def Agechange(dobtime,datatime):
     return [str(datatime.year - dobtime.year - ((dobtime.month, dobtime.day) < (dobtime.month, dobtime.day)))]
@@ -77,7 +60,7 @@ def chartcontent_layout():
             ],fluid=True),
 
             dbc.Container([
-                dcc.Graph(figure=fig)
+                html.Div(dcc.Graph(id="graph"))
             ]),
                         
         ])
